@@ -1,0 +1,23 @@
+# Runtime/intermediate outputs
+data/
+runs/
+
+# Python caches
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Coverage/build artifacts
+.coverage
+htmlcov/
+build/
+dist/
+
+# Virtual environments
+.venv/
+venv/
+
+# OS/editor noise
+.DS_Store
