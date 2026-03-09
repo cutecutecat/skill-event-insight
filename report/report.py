@@ -9,10 +9,16 @@ from typing import Any
 
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description="Synthesize final report from attack_result and dumped events")
-    p.add_argument("--attack-result", type=Path, required=True, help="judge attack_result.json")
-    p.add_argument("--events-dump", type=Path, required=True, help="event dump JSON path")
-    p.add_argument("--output-json", type=Path, default=Path("data/report.json"), help="Output report json path")
-    p.add_argument("--output-md", type=Path, default=Path("data/report.md"), help="Output report markdown path")
+    p.add_argument("--group", choices=["base", "inject", "threat", "test"], required=True, help="Case group")
+    p.add_argument(
+        "--runs-root",
+        type=Path,
+        default=Path("runs"),
+        help="Runs root; reads runs-root/<group>/attack_result.json and runs-root/<group>/*/event.json",
+    )
+    p.add_argument("--output-json", type=Path, default=None, help="Output report json path (default: runs-root/<group>/report.json)")
+    p.add_argument("--output-md", type=Path, default=None, help="Output report markdown path (default: runs-root/<group>/report.md)")
+    p.add_argument("-f", "--force", action="store_true", help="Overwrite outputs when they exist")
     return p.parse_args()
 
 
@@ -31,12 +37,37 @@ def event_blob(case_dump: dict[str, Any]) -> str:
     return ""
 
 
+def load_case_dump_map(group_root: Path) -> tuple[dict[str, dict[str, Any]], str]:
+    dump_map: dict[str, dict[str, Any]] = {}
+    matched = 0
+    for case_dir in sorted(group_root.iterdir(), key=lambda p: p.name):
+        if not case_dir.is_dir():
+            continue
+        case_event_path = case_dir / "event.json"
+        if not case_event_path.exists():
+            continue
+        matched += 1
+        case_dump_file = read_json(case_event_path)
+        case_dump = case_dump_file.get("case", {}) if isinstance(case_dump_file, dict) else {}
+        if not isinstance(case_dump, dict):
+            continue
+        case_id = str(case_dump.get("case_id", "")).strip() or case_dir.name
+        dump_map[case_id] = case_dump
+
+    if matched == 0:
+        raise SystemExit(f"Missing events dump files: {group_root.as_posix()}/*/event.json")
+    return dump_map, f"{group_root.as_posix()}/*/event.json"
+
+
 def main() -> None:
     args = parse_args()
-    inter = read_json(args.attack_result)
-    dump = read_json(args.events_dump)
+    group_root = args.runs_root / args.group
+    attack_result_path = group_root / "attack_result.json"
+    if not attack_result_path.exists():
+        raise SystemExit(f"Missing attack_result file: {attack_result_path}")
 
-    dump_map = {str(c.get("case_id", "")): c for c in dump.get("cases", [])}
+    inter = read_json(attack_result_path)
+    dump_map, events_dump_source = load_case_dump_map(group_root)
 
     merged_results = []
     for row in inter.get("results", []):
@@ -70,16 +101,20 @@ def main() -> None:
             "cases_with_events": cases_with_events,
         },
         "sources": {
-            "attack_result": args.attack_result.as_posix(),
-            "events_dump": args.events_dump.as_posix(),
+            "attack_result": attack_result_path.as_posix(),
+            "events_dump": events_dump_source,
         },
         "results": merged_results,
     }
 
-    args.output_json.parent.mkdir(parents=True, exist_ok=True)
-    args.output_md.parent.mkdir(parents=True, exist_ok=True)
-    json_path = args.output_json
-    md_path = args.output_md
+    json_path = args.output_json or (group_root / "report.json")
+    md_path = args.output_md or (group_root / "report.md")
+    if json_path.exists() and not args.force:
+        raise SystemExit(f"Output already exists: {json_path}\nUse --force to overwrite.")
+    if md_path.exists() and not args.force:
+        raise SystemExit(f"Output already exists: {md_path}\nUse --force to overwrite.")
+    json_path.parent.mkdir(parents=True, exist_ok=True)
+    md_path.parent.mkdir(parents=True, exist_ok=True)
 
     json_path.write_text(json.dumps(final_payload, indent=2, ensure_ascii=True) + "\n", encoding="utf-8")
 
@@ -87,10 +122,10 @@ def main() -> None:
         f"# Final Report ({inter.get('group')})",
         "",
         f"- total: {total}",
-        f"- label 0: {c0}",
-        f"- label 1: {c1}",
-        f"- label 2: {c2}",
-        f"- label 3: {c3}",
+        f"- 0 (safe): {c0}",
+        f"- 1 (blocked): {c1}",
+        f"- 2 (dangerous): {c2}",
+        f"- 3 (unknown): {c3}",
         f"- cases with events: {cases_with_events}",
         "",
         "## Cases",
