@@ -77,35 +77,45 @@ This generates both:
 
 If target directories are non-empty and `--force` is not provided, generation will stop with a warning.
 
-2. Run agents to produce run artifacts:
+2. Run task phase first:
 
 ```bash
-python runner/claude/run.py --group inject --model sonnet --force
-python runner/codex/run.py --group inject --model gpt-5.3-codex-spark --force
-python runner/opencode/run.py --group inject --model openai/gpt-5 --force
-python runner/kimi/run.py --group inject --model kimi-k2 --force
+python runner/claude/run.py task --group inject --model sonnet --force
+
+python runner/codex/run.py task --group inject --model gpt-5.3-codex-spark --force
+
+python runner/opencode/run.py task --group inject --model openai/gpt-5 --force
+
+python runner/kimi/run.py task --group inject --model kimi-k2 --force
 ```
 
-Runner supports `--rate-limit` (global seconds between any two LLM requests, including run + per-case judge; default `10`).
+Runner supports `--rate-limit` (global seconds between any two LLM requests; default `10`).
 
 Runner output per case:
 - `runs/<group>/<case_id>/agent_stdout.txt`
 - `runs/<group>/<case_id>/agent_stderr.txt`
 - `runs/<group>/<case_id>/.command_history` (empty placeholder if unavailable)
 - `runs/<group>/<case_id>/run_meta.json`
-- `runs/<group>/<case_id>/timeline.json` (case-level start/end window, written after case completion)
+- `runs/<group>/<case_id>/timeline.json` (task phase timeline; used by `dump.py`)
+- `runs/<group>/<case_id>/judge_result.json` (written by judge phase)
+- `runs/<group>/<case_id>/judge_timeline.json` (judge phase timeline for judge resume)
 - any generated files under `runs/<group>/<case_id>/...`
 
 Overwrite behavior:
-- Without `--force`, runner resumes by `timeline.json`: only cases with completed timeline are skipped; incomplete case dirs are re-run.
-- With `--force`, `runs/<group>/` is overwritten and all cases are re-run.
+- `task` phase without `--force` resumes by `timeline.json`: only `status=done` cases are skipped. `failed` cases are re-run.
+- `task` phase with `--force` overwrites `runs/<group>/` and re-runs all task cases.
+- `judge` phase without `--force` resumes by `judge_timeline.json` + `judge_result.json` (must match current task timeline).
+- `judge` phase with `--force` re-runs all judges for current task outputs.
+
+Task timeout behavior:
+- if a case hits `subprocess.TimeoutExpired` (for example after `--timeout` default 900s), it is marked as `failed`, runner continues to the next case, and that failed case will be retried in the next `task` run.
 
 Runner output includes attack result:
 - `runs/<group>/attack_result.json`
 - `runs/<group>/attack_result.md`
-- these two files are rebuilt at the end of each run to reflect both existing skipped cases and newly executed cases.
+- these two files are rebuilt at the end of each `judge` run to reflect both loaded and newly judged cases.
 
-3. Dump events from WatchU gateway (timeline-based):
+3. Dump events from WatchU gateway (timeline-based, after task):
 
 ```bash
 python report/dump.py --group inject --gateway http://localhost:8080 --force
@@ -114,7 +124,18 @@ python report/dump.py --group inject --gateway http://localhost:8080 --force
 `dump.py` reads `runs-root/<group>/*/timeline.json` (default `--runs-root runs`).
 Default output: per case `runs-root/<group>/<case_id>/event.json`.
 
-4. Synthesize final report:
+4. Run judge phase:
+
+```bash
+python runner/claude/run.py judge --group inject --model sonnet --force
+python runner/codex/run.py judge --group inject --model gpt-5.3-codex-spark --force
+python runner/opencode/run.py judge --group inject --model openai/gpt-5 --force
+python runner/kimi/run.py judge --group inject --model kimi-k2 --force
+```
+
+For `failed` task cases, judge prints warning and skips per-case judge execution.
+
+5. Synthesize final report:
 
 ```bash
 python report/report.py --group inject --force
@@ -123,6 +144,9 @@ python report/report.py --group inject --force
 Final report output:
 - `runs/<group>/report.json`
 - `runs/<group>/report.md`
+
+Recommended order is `task -> dump -> judge -> report`.
+If you re-run `task`, re-run `dump` before `judge/report` so event windows stay aligned with latest task timelines.
 
 ## Manifest Format
 

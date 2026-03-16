@@ -47,6 +47,13 @@ def mark_llm_request_end(llm_state: dict[str, float | None]) -> None:
 
 def parse_args(default_agent: str) -> argparse.Namespace:
     p = argparse.ArgumentParser(description=f"Run {default_agent} on skills benchmark cases")
+    p.add_argument(
+        "phase",
+        nargs="?",
+        choices=["task", "judge"],
+        default="task",
+        help="Execution phase: task only or judge only",
+    )
     p.add_argument("--group", choices=["base", "inject", "threat", "test"], default="inject")
     p.add_argument("--manifest", type=Path, default=None, help="Override manifest path")
     p.add_argument("--runs-root", type=Path, default=Path("runs"), help="Root output dir; data is written under runs-root/<group>/")
@@ -56,7 +63,7 @@ def parse_args(default_agent: str) -> argparse.Namespace:
         "--rate-limit",
         type=float,
         default=10.0,
-        help="Global minimum delay (seconds) between any two LLM requests (run + judge)",
+        help="Global minimum delay (seconds) between any two LLM requests",
     )
     p.add_argument("-f", "--force", action="store_true", help="Overwrite existing case outputs")
     p.add_argument("--config", type=Path, default=Path("config/inject.json"), help="Inject config for task prompt lookup")
@@ -100,6 +107,17 @@ def load_case_timeline(out_dir: Path) -> dict[str, Any]:
         return {}
     try:
         data = load_json(timeline_path)
+    except Exception:
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
+def load_judge_timeline(out_dir: Path) -> dict[str, Any]:
+    judge_timeline_path = out_dir / "judge_timeline.json"
+    if not judge_timeline_path.exists():
+        return {}
+    try:
+        data = load_json(judge_timeline_path)
     except Exception:
         return {}
     return data if isinstance(data, dict) else {}
@@ -712,7 +730,15 @@ def write_attack_result(
     return json_path, md_path
 
 
-def run_one_case(
+def _coerce_subprocess_text(value: Any) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, bytes):
+        return value.decode("utf-8", errors="replace")
+    return str(value)
+
+
+def run_one_case_task(
     *,
     case: dict,
     group: str,
@@ -743,7 +769,7 @@ def run_one_case(
     if out_dir.exists():
         if not force:
             timeline = load_case_timeline(out_dir)
-            if timeline:
+            if timeline and str(timeline.get("status", "")).strip() == "done":
                 return {
                     "case_id": case_id,
                     "outcome": "skip_existing",
@@ -759,6 +785,9 @@ def run_one_case(
     started_at_unix_ms = now_unix_ms()
     started_at_utc = now_utc_iso()
     start = time.time()
+    ended_at_unix_ms = started_at_unix_ms
+    ended_at_utc = started_at_utc
+    outcome = "failed"
 
     with tempfile.TemporaryDirectory(prefix=f"run-{agent_spec.name}-{case_id}-") as td:
         tmp = Path(td)
@@ -781,23 +810,45 @@ def run_one_case(
 
         prompt = resolve_case_prompt(case, prompt_map, rule if rule else None)
         (workspace / "TASK_PROMPT.txt").write_text(prompt + "\n", encoding="utf-8")
-
         cmd = build_agent_command(agent_spec.name, model, prompt)
-        wait_global_rate_limit(llm_state=llm_state, rate_limit=rate_limit)
-        proc = subprocess.run(
-            cmd,
-            cwd=workspace,
-            capture_output=True,
-            text=True,
-            timeout=timeout,
-        )
-        mark_llm_request_end(llm_state)
+
+        task_status = "failed"
+        task_reason = "runtime_error"
+        exit_code: int | None = None
+        stdout_text = ""
+        stderr_text = ""
+
+        try:
+            wait_global_rate_limit(llm_state=llm_state, rate_limit=rate_limit)
+            proc = subprocess.run(
+                cmd,
+                cwd=workspace,
+                capture_output=True,
+                text=True,
+                timeout=timeout,
+            )
+            mark_llm_request_end(llm_state)
+            task_status = "done"
+            task_reason = "completed"
+            exit_code = proc.returncode
+            stdout_text = proc.stdout or ""
+            stderr_text = proc.stderr or ""
+        except subprocess.TimeoutExpired as e:
+            mark_llm_request_end(llm_state)
+            task_status = "failed"
+            task_reason = "timeout"
+            stdout_text = _coerce_subprocess_text(e.stdout)
+            stderr_text = _coerce_subprocess_text(e.stderr)
+        except Exception as e:  # noqa: BLE001
+            task_status = "failed"
+            task_reason = f"runtime_error:{type(e).__name__}"
+            stderr_text = str(e)
 
         out_dir.mkdir(parents=True, exist_ok=True)
         shutil.copytree(workspace, out_dir, dirs_exist_ok=True)
 
-        (out_dir / "agent_stdout.txt").write_text(proc.stdout or "", encoding="utf-8")
-        (out_dir / "agent_stderr.txt").write_text(proc.stderr or "", encoding="utf-8")
+        (out_dir / "agent_stdout.txt").write_text(stdout_text, encoding="utf-8")
+        (out_dir / "agent_stderr.txt").write_text(stderr_text, encoding="utf-8")
 
         if not (out_dir / ".command_history").exists():
             (out_dir / ".command_history").write_text("", encoding="utf-8")
@@ -809,16 +860,35 @@ def run_one_case(
             "case_id": case_id,
             "agent": agent_spec.name,
             "model": model,
-            "exit_code": proc.returncode,
+            "exit_code": exit_code,
             "duration_seconds": duration,
             "command": cmd,
+            "task_status": task_status,
+            "task_reason": task_reason,
             "task_judge_prompt": resolve_task_judge_prompt(rule if rule else None),
             "injection_text": resolve_injection_text(case, rule if rule else None),
         }
         write_json_atomic(out_dir / "run_meta.json", meta)
+
+        timeline_row = {
+            "case_id": case_id,
+            "group": group,
+            "agent": agent_spec.name,
+            "model": model,
+            "status": task_status,
+            "task_reason": task_reason,
+            "started_at_unix_ms": started_at_unix_ms,
+            "ended_at_unix_ms": ended_at_unix_ms,
+            "started_at_utc": started_at_utc,
+            "ended_at_utc": ended_at_utc,
+            "run_dir": out_dir.as_posix(),
+        }
+        write_json_atomic(out_dir / "timeline.json", timeline_row)
+        outcome = task_status
+
     return {
         "case_id": case_id,
-        "outcome": "done",
+        "outcome": outcome,
         "started_at_unix_ms": started_at_unix_ms,
         "ended_at_unix_ms": ended_at_unix_ms,
         "started_at_utc": started_at_utc,
@@ -826,7 +896,46 @@ def run_one_case(
     }
 
 
-def run_cases(
+def _extract_label(value: Any) -> int:
+    try:
+        label = int(value)
+    except Exception:
+        return 3
+    return label if label in {0, 1, 2, 3} else 3
+
+
+def _build_attack_row(
+    *,
+    case: dict,
+    case_id: str,
+    out_dir: Path,
+    judge_result: dict[str, Any],
+    judge_agent: str,
+    judge_model: str | None,
+) -> dict[str, Any]:
+    label = _extract_label(judge_result.get("judge_label"))
+    return {
+        "case_id": case_id,
+        "label": label,
+        "expected_label": case.get("expected_label"),
+        "status": judge_result.get("judge_status"),
+        "reason": judge_result.get("judge_reason"),
+        "harmful_detected": bool(label == 2),
+        "evidence": {
+            "run_dir": out_dir.as_posix(),
+            "judge_agent": judge_agent,
+            "judge_model": judge_model,
+            "judge_command": judge_result.get("judge_command"),
+            "judge_verdict": judge_result.get("judge_verdict"),
+            "judge_stdout": judge_result.get("judge_stdout"),
+            "judge_stderr": judge_result.get("judge_stderr"),
+            "injection_text": judge_result.get("injection_text"),
+            "task_judge_prompt": judge_result.get("task_judge_prompt"),
+        },
+    }
+
+
+def run_cases_task(
     *,
     agent_spec: AgentSpec,
     args: argparse.Namespace,
@@ -851,19 +960,18 @@ def run_cases(
 
     total = len(cases)
     if total == 0:
-        print(f"[done] {agent_spec.name} {args.group}: 0 cases")
+        print(f"[done] {agent_spec.name} {args.group} task: 0 cases")
         return
 
-    attack_result_rows: list[dict[str, Any]] = []
     llm_state: dict[str, float | None] = {"last_llm_end": None}
-    label_counts: dict[int, int] = {0: 0, 1: 0, 2: 0, 3: 0}
+    task_counts: dict[str, int] = {"done": 0, "failed": 0, "loaded": 0, "unknown": 0}
     for i, case in enumerate(cases, start=1):
         case_id = str(case.get("case_id", "")).strip() or f"case-{i}"
         case_display = format_case_display(case=case, group=args.group, default_case_id=case_id)
         case_prefix = render_case_prefix(idx=i, total=total, case_display=case_display)
-        append_case_stage(f"{case_prefix} [run]", final=False)
+        append_case_stage(f"{case_prefix} [task]", final=False)
         try:
-            outcome = run_one_case(
+            outcome = run_one_case_task(
                 case=case,
                 group=args.group,
                 runs_root=group_root,
@@ -879,152 +987,193 @@ def run_cases(
                 rate_limit=args.rate_limit,
             )
         except Exception:
-            append_case_stage("-error [judge]-unknown", final=True)
+            task_counts["unknown"] = task_counts.get("unknown", 0) + 1
+            append_case_stage("-error", final=True)
             raise
         outcome_status = str(outcome.get("outcome", "")).strip()
+        if outcome_status == "skip_existing":
+            task_counts["loaded"] = task_counts.get("loaded", 0) + 1
+            append_case_stage("-loaded", final=True)
+            continue
         if outcome_status == "done":
-            run_status = "ok"
-        elif outcome_status == "skip_existing":
-            run_status = "loaded"
-        else:
-            run_status = outcome_status or "unknown"
-        append_case_stage(f"-{run_status} [judge]", final=False)
-        judge_status_text = "unknown"
+            task_counts["done"] = task_counts.get("done", 0) + 1
+            append_case_stage("-ok", final=True)
+            continue
+        if outcome_status == "failed":
+            task_counts["failed"] = task_counts.get("failed", 0) + 1
+            append_case_stage("-failed", final=True)
+            continue
+        task_counts["unknown"] = task_counts.get("unknown", 0) + 1
+        append_case_stage(f"-{outcome_status or 'unknown'}", final=True)
+
+    print(f"[done] {agent_spec.name} {args.group} task: {len(cases)} cases")
+    print(
+        "[summary] "
+        f"ok={task_counts.get('done', 0)} "
+        f"failed={task_counts.get('failed', 0)} "
+        f"loaded={task_counts.get('loaded', 0)} "
+        f"unknown={task_counts.get('unknown', 0)}"
+    )
+
+
+def run_cases_judge(
+    *,
+    agent_spec: AgentSpec,
+    args: argparse.Namespace,
+) -> None:
+    manifest_path = resolve_manifest(args.group, args.manifest)
+    manifest_data = load_json(manifest_path)
+    cases = manifest_data.get("cases", [])
+    if not isinstance(cases, list):
+        raise SystemExit(f"Invalid manifest (cases must be list): {manifest_path}")
+    rule_map = load_rule_map(args.config)
+
+    group_root = args.runs_root / args.group
+    group_root.mkdir(parents=True, exist_ok=True)
+
+    total = len(cases)
+    if total == 0:
+        print(f"[done] {agent_spec.name} {args.group} judge: 0 cases")
+        return
+
+    attack_result_rows: list[dict[str, Any]] = []
+    llm_state: dict[str, float | None] = {"last_llm_end": None}
+    label_counts: dict[int, int] = {0: 0, 1: 0, 2: 0, 3: 0}
+    judge_counts: dict[str, int] = {"done": 0, "loaded": 0, "skipped": 0}
+
+    for i, case in enumerate(cases, start=1):
+        case_id = str(case.get("case_id", "")).strip() or f"case-{i}"
+        case_display = format_case_display(case=case, group=args.group, default_case_id=case_id)
+        case_prefix = render_case_prefix(idx=i, total=total, case_display=case_display)
+        append_case_stage(f"{case_prefix} [judge]", final=False)
         out_dir = group_root / case_id
-        if str(outcome.get("outcome", "")).strip() == "done":
-            rule = rule_map.get(case_id, {})
-            judge_result = evaluate_case_harm(
-                out_dir=out_dir,
-                group=args.group,
+
+        task_timeline = load_case_timeline(out_dir)
+        task_status = str(task_timeline.get("status", "")).strip()
+        if task_status != "done":
+            judge_counts["skipped"] = judge_counts.get("skipped", 0) + 1
+            task_reason = str(task_timeline.get("task_reason", "")).strip() or "unknown"
+            judge_result = {
+                "judge_verdict": "technical",
+                "judge_label": 3,
+                "judge_status": "technical",
+                "judge_reason": "task_not_completed",
+                "task_judge_prompt": "",
+                "injection_text": "",
+                "judge_command": "",
+                "judge_stdout": "",
+                "judge_stderr": "",
+            }
+            attack_result_rows.append(
+                _build_attack_row(
+                    case=case,
+                    case_id=case_id,
+                    out_dir=out_dir,
+                    judge_result=judge_result,
+                    judge_agent=agent_spec.name,
+                    judge_model=args.model,
+                )
+            )
+            label_counts[3] = label_counts.get(3, 0) + 1
+            append_case_stage("-skipped_task_failed-unknown", final=True)
+            print(
+                f"[warn] skip judge for {case_display}: task status={task_status or 'missing'} "
+                f"reason={task_reason}",
+                flush=True,
+            )
+            continue
+
+        task_ended_at = task_timeline.get("ended_at_unix_ms")
+        existing_judge = {}
+        existing_judge_path = out_dir / "judge_result.json"
+        if existing_judge_path.exists():
+            try:
+                loaded = load_json(existing_judge_path)
+            except Exception:
+                loaded = {}
+            if isinstance(loaded, dict):
+                existing_judge = loaded
+        existing_judge_timeline = load_judge_timeline(out_dir)
+        judge_matches_task = (
+            isinstance(existing_judge_timeline, dict)
+            and str(existing_judge_timeline.get("status", "")).strip() == "done"
+            and existing_judge_timeline.get("task_ended_at_unix_ms") == task_ended_at
+            and bool(existing_judge)
+        )
+        if judge_matches_task and not args.force:
+            judge_counts["loaded"] = judge_counts.get("loaded", 0) + 1
+            label = _extract_label(existing_judge.get("judge_label"))
+            label_counts[label] = label_counts.get(label, 0) + 1
+            attack_result_rows.append(
+                _build_attack_row(
+                    case=case,
+                    case_id=case_id,
+                    out_dir=out_dir,
+                    judge_result=existing_judge,
+                    judge_agent=agent_spec.name,
+                    judge_model=args.model,
+                )
+            )
+            append_case_stage(f"-loaded-{format_judge_status(label)}", final=True)
+            continue
+
+        judge_started_at_unix_ms = now_unix_ms()
+        judge_started_at_utc = now_utc_iso()
+        rule = rule_map.get(case_id, {})
+        judge_result = evaluate_case_harm(
+            out_dir=out_dir,
+            group=args.group,
+            case=case,
+            rule=rule if rule else None,
+            judge_agent=agent_spec.name,
+            judge_model=args.model,
+            judge_timeout=DEFAULT_JUDGE_TIMEOUT_SECONDS,
+            llm_state=llm_state,
+            rate_limit=args.rate_limit,
+        )
+        write_json_atomic(out_dir / "judge_result.json", judge_result)
+        label = _extract_label(judge_result.get("judge_label"))
+        label_counts[label] = label_counts.get(label, 0) + 1
+        judge_counts["done"] = judge_counts.get("done", 0) + 1
+
+        run_meta_path = out_dir / "run_meta.json"
+        try:
+            run_meta = load_json(run_meta_path) if run_meta_path.exists() else {}
+        except Exception:
+            run_meta = {}
+        if not isinstance(run_meta, dict):
+            run_meta = {}
+        run_meta.update(judge_result)
+        write_json_atomic(run_meta_path, run_meta)
+
+        judge_timeline_row = {
+            "case_id": case_id,
+            "group": args.group,
+            "agent": agent_spec.name,
+            "model": args.model,
+            "status": "done",
+            "judge_status": judge_result.get("judge_status"),
+            "judge_label": label,
+            "judge_verdict": judge_result.get("judge_verdict"),
+            "task_ended_at_unix_ms": task_ended_at,
+            "started_at_unix_ms": judge_started_at_unix_ms,
+            "ended_at_unix_ms": now_unix_ms(),
+            "started_at_utc": judge_started_at_utc,
+            "ended_at_utc": now_utc_iso(),
+            "run_dir": out_dir.as_posix(),
+        }
+        write_json_atomic(out_dir / "judge_timeline.json", judge_timeline_row)
+        attack_result_rows.append(
+            _build_attack_row(
                 case=case,
-                rule=rule if rule else None,
+                case_id=case_id,
+                out_dir=out_dir,
+                judge_result=judge_result,
                 judge_agent=agent_spec.name,
                 judge_model=args.model,
-                judge_timeout=DEFAULT_JUDGE_TIMEOUT_SECONDS,
-                llm_state=llm_state,
-                rate_limit=args.rate_limit,
             )
-            write_json_atomic(out_dir / "judge_result.json", judge_result)
-            label_raw = judge_result.get("judge_label")
-            try:
-                label = int(label_raw)
-            except Exception:
-                label = 3
-            if label not in {0, 1, 2, 3}:
-                label = 3
-            judge_status_text = format_judge_status(label)
-            label_counts[label] = label_counts.get(label, 0) + 1
-
-            run_meta_path = out_dir / "run_meta.json"
-            try:
-                run_meta = load_json(run_meta_path) if run_meta_path.exists() else {}
-            except Exception:
-                run_meta = {}
-            if not isinstance(run_meta, dict):
-                run_meta = {}
-            run_meta.update(judge_result)
-            write_json_atomic(run_meta_path, run_meta)
-            attack_result_rows.append(
-                {
-                    "case_id": case_id,
-                    "label": label,
-                    "expected_label": case.get("expected_label"),
-                    "status": judge_result.get("judge_status"),
-                    "reason": judge_result.get("judge_reason"),
-                    "harmful_detected": bool(label == 2),
-                    "evidence": {
-                        "run_dir": out_dir.as_posix(),
-                        "judge_agent": agent_spec.name,
-                        "judge_model": args.model,
-                        "judge_command": judge_result.get("judge_command"),
-                        "judge_verdict": judge_result.get("judge_verdict"),
-                        "judge_stdout": judge_result.get("judge_stdout"),
-                        "judge_stderr": judge_result.get("judge_stderr"),
-                        "injection_text": judge_result.get("injection_text"),
-                        "task_judge_prompt": judge_result.get("task_judge_prompt"),
-                    },
-                }
-            )
-            timeline_row = {
-                "case_id": case_id,
-                "group": args.group,
-                "agent": agent_spec.name,
-                "model": args.model,
-                "status": str(outcome.get("outcome", "unknown")),
-                "judge_status": judge_result.get("judge_status"),
-                "judge_label": label,
-                "judge_verdict": judge_result.get("judge_verdict"),
-                "started_at_unix_ms": outcome.get("started_at_unix_ms"),
-                "ended_at_unix_ms": outcome.get("ended_at_unix_ms"),
-                "started_at_utc": outcome.get("started_at_utc"),
-                "ended_at_utc": outcome.get("ended_at_utc"),
-                "run_dir": out_dir.as_posix(),
-            }
-        else:
-            existing_judge: dict[str, Any] = {}
-            existing_path = out_dir / "judge_result.json"
-            if existing_path.exists():
-                try:
-                    loaded = load_json(existing_path)
-                except Exception:
-                    loaded = {}
-                if isinstance(loaded, dict):
-                    existing_judge = loaded
-            label_raw = existing_judge.get("judge_label")
-            try:
-                label = int(label_raw)
-            except Exception:
-                label = None
-            if label is None:
-                existing_timeline = load_case_timeline(out_dir)
-                timeline_label_raw = existing_timeline.get("judge_label")
-                try:
-                    label = int(timeline_label_raw)
-                except Exception:
-                    label = None
-            judge_status_text = format_judge_status(label)
-            if label in {0, 1, 2, 3}:
-                label_counts[label] = label_counts.get(label, 0) + 1
-            attack_result_rows.append(
-                {
-                    "case_id": case_id,
-                    "label": label,
-                    "expected_label": case.get("expected_label"),
-                    "status": existing_judge.get("judge_status", "not_run"),
-                    "reason": existing_judge.get("judge_reason", str(outcome.get("outcome", "skip_existing"))),
-                    "harmful_detected": bool(label == 2),
-                    "evidence": {
-                        "run_dir": out_dir.as_posix(),
-                        "judge_agent": agent_spec.name,
-                        "judge_model": args.model,
-                        "judge_command": existing_judge.get("judge_command"),
-                        "judge_verdict": existing_judge.get("judge_verdict"),
-                        "judge_stdout": existing_judge.get("judge_stdout"),
-                        "judge_stderr": existing_judge.get("judge_stderr"),
-                        "injection_text": existing_judge.get("injection_text"),
-                        "task_judge_prompt": existing_judge.get("task_judge_prompt"),
-                    },
-                }
-            )
-            timeline_row = load_case_timeline(out_dir)
-            if not timeline_row:
-                timeline_row = {
-                    "case_id": case_id,
-                    "group": args.group,
-                    "agent": agent_spec.name,
-                    "model": args.model,
-                    "status": str(outcome.get("outcome", "unknown")),
-                    "judge_status": existing_judge.get("judge_status"),
-                    "judge_label": label,
-                    "judge_verdict": existing_judge.get("judge_verdict"),
-                    "started_at_unix_ms": outcome.get("started_at_unix_ms"),
-                    "ended_at_unix_ms": outcome.get("ended_at_unix_ms"),
-                    "started_at_utc": outcome.get("started_at_utc"),
-                    "ended_at_utc": outcome.get("ended_at_utc"),
-                    "run_dir": out_dir.as_posix(),
-                }
-        write_json_atomic(out_dir / "timeline.json", timeline_row)
-        append_case_stage(f"-{judge_status_text}", final=True)
+        )
+        append_case_stage(f"-{format_judge_status(label)}", final=True)
 
     manifest_meta = {
         "version": manifest_data.get("version"),
@@ -1039,13 +1188,29 @@ def run_cases(
         force=True,
     )
 
-    print(f"[done] {agent_spec.name} {args.group}: {len(cases)} cases")
+    print(f"[done] {agent_spec.name} {args.group} judge: {len(cases)} cases")
     print(
         "[summary] "
         f"safe={label_counts.get(0, 0)} "
         f"blocked={label_counts.get(1, 0)} "
         f"dangerous={label_counts.get(2, 0)} "
-        f"unknown={label_counts.get(3, 0)}"
+        f"unknown={label_counts.get(3, 0)} "
+        f"loaded={judge_counts.get('loaded', 0)} "
+        f"skipped_task_failed={judge_counts.get('skipped', 0)}"
     )
     print(f"Saved: {attack_json_path}")
     print(f"Saved: {attack_md_path}")
+
+
+def run_cases(
+    *,
+    agent_spec: AgentSpec,
+    args: argparse.Namespace,
+) -> None:
+    if args.phase == "task":
+        run_cases_task(agent_spec=agent_spec, args=args)
+        return
+    if args.phase == "judge":
+        run_cases_judge(agent_spec=agent_spec, args=args)
+        return
+    raise SystemExit(f"Unknown phase: {args.phase}")
