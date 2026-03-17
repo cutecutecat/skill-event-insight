@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import base64
+import binascii
 import datetime as dt
 import json
 import time
@@ -14,7 +15,7 @@ from typing import Any
 
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description="Dump WatchU events from gateway by case timeline")
-    p.add_argument("--group", choices=["base", "inject", "threat", "test"], default="inject")
+    p.add_argument("--group", type=str, default="inject")
     p.add_argument("--runs-root", type=Path, default=Path("runs"), help="Root output dir; data is read from runs-root/<group>/")
     p.add_argument("--gateway", type=str, default="http://localhost:8080", help="WatchU gateway base URL")
     p.add_argument("--host", type=str, default=None, help="Optional host override; by default query from gateway /analysis/hosts")
@@ -79,7 +80,7 @@ def http_get_json(base_url: str, path: str, params: dict[str, Any]) -> Any:
         url = f"{url}?{qs}"
     req = urllib.request.Request(url, method="GET")
     with urllib.request.urlopen(req, timeout=20) as resp:
-        raw = resp.read().decode("utf-8", errors="ignore")
+        raw = resp.read().decode("utf-8")
     return json.loads(raw) if raw.strip() else []
 
 
@@ -95,35 +96,6 @@ def resolve_host(base_url: str, gateway: str, manual_host: str | None, limit: in
     except Exception:
         pass
     return host_from_gateway(gateway)
-
-
-def _decode_body_to_text(body: Any) -> tuple[str | None, str]:
-    # gateway body is often base64 string due []byte JSON encoding.
-    if body is None:
-        return None, "none"
-    if isinstance(body, str):
-        s = body.strip()
-        if not s:
-            return "", "plain_text"
-        try:
-            decoded = base64.b64decode(s, validate=True)
-            text = decoded.decode("utf-8", errors="replace")
-            return text, "base64"
-        except Exception:
-            return body, "plain_text"
-    if isinstance(body, list) and all(isinstance(x, int) for x in body):
-        try:
-            text = bytes(body).decode("utf-8", errors="replace")
-            return text, "byte_array"
-        except Exception:
-            return str(body), "byte_array_raw"
-    return str(body), "stringified"
-
-
-def _parse_http_body(event: dict[str, Any]) -> str | None:
-    body = event.get("body")
-    text, _ = _decode_body_to_text(body)
-    return text[:2000] if text is not None else None
 
 
 WATCHU_INTERNAL_ARG_MARKER = "pg_isready -U watchu -d watchu"
@@ -259,6 +231,26 @@ def _filter_watchu_internal_events(
     return filtered_pe, filtered_phe, sorted(blocked_root_pids), sorted(blocked_root_exec_ids)
 
 
+def _parse_http_body(event: dict[str, Any]) -> tuple[str | None, str | None]:
+    body = event.get("body")
+    if body is None:
+        return None, None
+    if not isinstance(body, str):
+        return None, f"unsupported body type: {type(body).__name__}; expected str"
+
+    s = body.strip()
+    if not s:
+        return body, None
+    try:
+        decoded = base64.b64decode(s, validate=True)
+    except (binascii.Error, ValueError):
+        return None, "body is not valid base64"
+    try:
+        return decoded.decode("utf-8", errors="backslashreplace"), None
+    except UnicodeDecodeError:
+        return None, "base64-decoded bytes are not valid UTF-8"
+
+
 def dump_case(
     *,
     base_url: str,
@@ -299,7 +291,8 @@ def dump_case(
 
     since = to_rfc3339_utc(start_ms)
     until = to_rfc3339_utc(end_ms)
-    params = {"host": host, "since": since, "until": until, "limit": max(1, min(limit, 1000))}
+    query_limit = max(1, min(limit, 1000))
+    params = {"host": host, "since": since, "until": until, "limit": query_limit}
 
     try:
         process_events = http_get_json(base_url, "/analysis/process_events", params)
@@ -313,13 +306,30 @@ def dump_case(
     phe = process_http_events if isinstance(process_http_events, list) else []
     pe, phe, blocked_root_pids, blocked_root_exec_ids = _filter_watchu_internal_events(pe, phe)
     parsed_phe: list[dict[str, Any]] = []
-    for ev in phe:
-        if isinstance(ev, dict):
-            ev2 = dict(ev)
-            ev2["body_parsed"] = _parse_http_body(ev2)
-            parsed_phe.append(ev2)
-        else:
-            parsed_phe.append({"raw": ev, "body_parsed": None})
+    full_phe: list[dict[str, Any]] = []
+    body_parse_warnings: list[str] = []
+    for idx, ev in enumerate(phe):
+        if not isinstance(ev, dict):
+            parsed_phe.append(
+                {
+                    "raw": ev,
+                    "body_parsed": None,
+                    "body_parse_warning": "non-object event; cannot parse body",
+                }
+            )
+            full_phe.append({"raw": ev, "body_parse_warning": "non-object event; cannot parse body"})
+            body_parse_warnings.append(f"process_http_events[{idx}]: non-object event; cannot parse body")
+            continue
+        ev2 = dict(ev)
+        parsed_body, parse_warning = _parse_http_body(ev2)
+        ev2["body_parsed"] = parsed_body
+        if parse_warning:
+            ev2["body_parse_warning"] = parse_warning
+            body_parse_warnings.append(f"process_http_events[{idx}]: {parse_warning}")
+        parsed_phe.append(ev2)
+        ev_full = dict(ev2)
+        ev_full.pop("body_parsed", None)
+        full_phe.append(ev_full)
     table_counts = {
         "process_events": len(pe),
         "process_http_events": len(parsed_phe),
@@ -328,6 +338,12 @@ def dump_case(
 
     out["event_count"] = total
     out["table_counts"] = table_counts
+    if len(pe) >= query_limit or len(phe) >= query_limit:
+        out["integrity_warnings"] = [
+            "At least one table hit request limit; result may be incomplete. Increase --limit if gateway allows, or split time windows.",
+        ]
+    if body_parse_warnings:
+        out["body_parse_warnings"] = body_parse_warnings
     out["time_window"] = {
         "started_at_unix_ms": int(start_raw),
         "ended_at_unix_ms": int(end_raw),
@@ -343,9 +359,70 @@ def dump_case(
         out["filtered_root_exec_ids"] = blocked_root_exec_ids
     out["events"] = {
         "process_events": pe,
-        "process_http_events": parsed_phe,
+        "process_http_events": full_phe,
     }
+    out["_process_http_events_parsed"] = parsed_phe
     return out
+
+
+def _http_event_kind(ev: dict[str, Any]) -> str:
+    for key in ("direction", "message_type", "event_type", "kind", "type"):
+        raw = ev.get(key)
+        if raw is None:
+            continue
+        s = str(raw).strip().lower()
+        if "request" in s:
+            return "REQUEST"
+        if "response" in s:
+            return "RESPONSE"
+
+    # Heuristic fallback when explicit direction is not present.
+    if ev.get("request") is not None and ev.get("response") is None:
+        return "REQUEST"
+    if ev.get("response") is not None and ev.get("request") is None:
+        return "RESPONSE"
+    if ev.get("method") is not None and ev.get("status_code") is None:
+        return "REQUEST"
+    if ev.get("status_code") is not None:
+        return "RESPONSE"
+    return "HTTP"
+
+
+def _materialize_newlines(text: str) -> str:
+    # Preserve raw separator intent from payloads that encode newlines as "\n".
+    return text.replace("\\r\\n", "\n").replace("\\n", "\n")
+
+
+def render_http_txt(process_http_events_parsed: list[Any]) -> str:
+    lines: list[str] = []
+    for idx, ev in enumerate(process_http_events_parsed, start=1):
+        kind = "HTTP"
+        if isinstance(ev, dict):
+            kind = _http_event_kind(ev)
+        begin = f"<<<<__WATCHU_{kind}_EVENT_{idx:05d}_BEGIN__>>>>"
+        end = f"<<<<__WATCHU_{kind}_EVENT_{idx:05d}_END__>>>>"
+        lines.append(begin)
+        if isinstance(ev, dict):
+            body = ev.get("body_parsed")
+            if body is not None:
+                lines.append(_materialize_newlines(str(body)))
+        lines.append(end)
+        lines.append("")
+    return "\n".join(lines).rstrip() + ("\n" if lines else "")
+
+
+def render_exec_txt(process_events: list[Any]) -> str:
+    lines: list[str] = []
+    for idx, ev in enumerate(process_events, start=1):
+        begin = f"<<<<__WATCHU_EXEC_EVENT_{idx:05d}_BEGIN__>>>>"
+        end = f"<<<<__WATCHU_EXEC_EVENT_{idx:05d}_END__>>>>"
+        line = ""
+        if isinstance(ev, dict):
+            comm = str(ev.get("comm", "")).strip()
+            args = str(ev.get("args", "")).strip()
+            line = f"{comm} {args}".strip()
+        lines.extend([begin, line, end, ""])
+    return "\n".join(lines).rstrip() + ("\n" if lines else "")
 
 
 def main() -> None:
@@ -377,10 +454,20 @@ def main() -> None:
                 continue
             case_dir = group_dir / case_id
 
-        output = case_dir / "event.json"
-        if output.exists() and not args.force:
-            raise SystemExit(f"Output already exists: {output}\nUse --force to overwrite.")
-        output.parent.mkdir(parents=True, exist_ok=True)
+        output_full = case_dir / "event.full.json"
+        output_http = case_dir / "event.http.txt"
+        output_exec = case_dir / "event.exec.txt"
+        for output in (output_full, output_http, output_exec):
+            if output.exists() and not args.force:
+                raise SystemExit(f"Output already exists: {output}\nUse --force to overwrite.")
+        case_dir.mkdir(parents=True, exist_ok=True)
+
+        parsed_http = row.pop("_process_http_events_parsed", [])
+        events = row.get("events", {}) if isinstance(row, dict) else {}
+        process_events = events.get("process_events", []) if isinstance(events, dict) else []
+        http_txt = render_http_txt(parsed_http if isinstance(parsed_http, list) else [])
+        exec_txt = render_exec_txt(process_events if isinstance(process_events, list) else [])
+
         payload: dict[str, Any] = {
             "group": args.group,
             "source": "dump_gateway",
@@ -391,10 +478,12 @@ def main() -> None:
             "host": host,
             "case": row,
         }
-        output.write_text(json.dumps(payload, indent=2, ensure_ascii=True) + "\n", encoding="utf-8")
+        output_full.write_text(json.dumps(payload, indent=2, ensure_ascii=True) + "\n", encoding="utf-8")
+        output_http.write_text(http_txt, encoding="utf-8")
+        output_exec.write_text(exec_txt, encoding="utf-8")
         saved_count += 1
 
-    print(f"Saved {saved_count} case event files under: {group_dir}")
+    print(f"Saved {saved_count} case event.full.json + event.http.txt + event.exec.txt under: {group_dir}")
 
 
 if __name__ == "__main__":

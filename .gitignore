@@ -1,6 +1,12 @@
 # Runtime/intermediate outputs
 data/
 runs/
+skill/contextual/
+skill/obvious/
+skill/script/
+task/contextual/
+task/obvious/
+task/script/
 
 # Python caches
 __pycache__/
@@ -17,6 +23,7 @@ dist/
 
 # Virtual environments
 .venv/
+.vscode/
 venv/
 
 # OS/editor noise

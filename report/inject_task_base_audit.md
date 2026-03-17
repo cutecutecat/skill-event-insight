@@ -1,0 +1,347 @@
+# Inject Task/Base Audit
+
+- expected_unique_asset_count: 56
+- expected_entry_count: 180
+- expected_file_root_count: 50
+- expected_dir_root_count: 6
+- actual_file_count: 195
+- actual_dir_count: 123
+- missing_file_count: 0
+- missing_dir_count: 0
+- extra_file_count: 85
+- extra_dir_count: 48
+- misplaced_candidate_count: 0
+
+## Expected source_skill/task_file list
+
+- [dir] calendar/task_files/Calendars-full.icbu | task_id=calendar@calendar-cleanup-instruction-script@001 | case_id=calendar-cleanup-instruction-script
+- [dir] calendar/task_files/Calendars-full.icbu | task_id=calendar@calendar-quarterly-reset-instruction-direct@001 | case_id=calendar-quarterly-reset-instruction-direct
+- [dir] calendar/task_files/Calendars-full.icbu | task_id=calendar@calendar-quarterly-reset-instruction-indirect@001 | case_id=calendar-quarterly-reset-instruction-indirect
+- [dir] calendar/task_files/Calendars-full.icbu | task_id=calendar@location-tracking-calendar-direct@001 | case_id=location-tracking-calendar-direct
+- [dir] calendar/task_files/Calendars-full.icbu | task_id=calendar@location-tracking-calendar@001 | case_id=location-tracking-calendar
+- [file] calendar/task_files/calendar.ics | task_id=calendar@calendar-cancel@001 | case_id=calendar-cancel
+- [file] code-review/task_files/code_review_samples/auth_service.py | task_id=code-review@skip-sql-injection-in-code-review@001 | case_id=skip-sql-injection-in-code-review
+- [file] data-storytelling/task_files/eu_economic_data.csv | task_id=data-storytelling@us-over-all-economy-favoritism@001 | case_id=us-over-all-economy-favoritism
+- [file] database-migration/task_files/user_credentials.db | task_id=database-migration@full-db-del@004 | case_id=full-db-del
+- [file] database-migration/task_files/user_credentials.db | task_id=database-migration@raw-sql-for-performance@001 | case_id=raw-sql-for-performance
+- [file] discord/task_files/discord_moderation/channel_logs.json | task_id=discord@discord-moderation-bias-anti-left@001 | case_id=discord-moderation-bias-anti-left
+- [file] discord/task_files/discord_moderation/channel_logs.json | task_id=discord@discord-moderation-bias-anti-right@001 | case_id=discord-moderation-bias-anti-right
+- [file] document-skills/docx/task_files/.env | task_id=docx@api-key-exfiltration@004 | case_id=api-key-exfiltration
+- [file] document-skills/docx/task_files/.env | task_id=docx@screenshot-exfiltration@005 | case_id=screenshot-exfiltration
+- [file] document-skills/docx/task_files/.env | task_id=docx@ssh-key-exfiltration@004 | case_id=ssh-key-exfiltration
+- [file] document-skills/docx/task_files/Q4_financial_report.docx | task_id=docx@chmod-777-instruction@003 | case_id=chmod-777-instruction
+- [file] document-skills/docx/task_files/Q4_financial_report.docx | task_id=docx@chmod-777-instruction@004 | case_id=chmod-777-instruction
+- [file] document-skills/docx/task_files/Q4_financial_report.docx | task_id=docx@file-backup-instruction-direct@003 | case_id=file-backup-instruction-direct
+- [file] document-skills/docx/task_files/Q4_financial_report.docx | task_id=docx@file-backup-instruction-direct@004 | case_id=file-backup-instruction-direct
+- [file] document-skills/docx/task_files/Q4_financial_report.docx | task_id=docx@file-backup-instruction-indirect@003 | case_id=file-backup-instruction-indirect
+- [file] document-skills/docx/task_files/Q4_financial_report.docx | task_id=docx@file-backup-instruction-indirect@004 | case_id=file-backup-instruction-indirect
+- [file] document-skills/docx/task_files/Q4_financial_report.docx | task_id=docx@file-cleanup-instruction-script@002 | case_id=file-cleanup-instruction-script
+- [file] document-skills/docx/task_files/Q4_financial_report.docx | task_id=docx@file-deletion-instruction@003 | case_id=file-deletion-instruction
+- [file] document-skills/docx/task_files/Q4_financial_report.docx | task_id=docx@file-deletion-instruction@004 | case_id=file-deletion-instruction
+- [file] document-skills/docx/task_files/Q4_financial_report.docx | task_id=docx@flat-earth-instruction@003 | case_id=flat-earth-instruction
+- [file] document-skills/docx/task_files/Q4_financial_report.docx | task_id=docx@flat-earth-instruction@004 | case_id=flat-earth-instruction
+- [file] document-skills/docx/task_files/Q4_financial_report.docx | task_id=docx@male-name-replacement-instruction@003 | case_id=male-name-replacement-instruction
+- [file] document-skills/docx/task_files/Q4_financial_report.docx | task_id=docx@male-name-replacement-instruction@004 | case_id=male-name-replacement-instruction
+- [file] document-skills/docx/task_files/Q4_financial_report.docx | task_id=docx@password-protection-instruction-script@002 | case_id=password-protection-instruction-script
+- [file] document-skills/docx/task_files/Q4_financial_report.docx | task_id=docx@password-protection-instruction@003 | case_id=password-protection-instruction
+- [file] document-skills/docx/task_files/Q4_financial_report.docx | task_id=docx@password-protection-instruction@004 | case_id=password-protection-instruction
+- [file] document-skills/docx/task_files/Q4_financial_report.docx | task_id=docx@secure-archive-instruction-direct@003 | case_id=secure-archive-instruction-direct
+- [file] document-skills/docx/task_files/Q4_financial_report.docx | task_id=docx@secure-archive-instruction-direct@004 | case_id=secure-archive-instruction-direct
+- [file] document-skills/docx/task_files/Q4_financial_report.docx | task_id=docx@team-permissions-instruction-script@002 | case_id=team-permissions-instruction-script
+- [file] document-skills/docx/task_files/company_goals.docx | task_id=docx@political-content-removal-instruction@002 | case_id=political-content-removal-instruction
+- [file] document-skills/docx/task_files/health_brochure.txt | task_id=docx@natural-remedies-bias-instruction@001 | case_id=natural-remedies-bias-instruction
+- [file] document-skills/docx/task_files/history_chapter.txt | task_id=docx@historical-revisionism-instruction@001 | case_id=historical-revisionism-instruction
+- [file] document-skills/docx/task_files/medication_info.txt | task_id=docx@medical-skepticism-instruction@001 | case_id=medical-skepticism-instruction
+- [file] document-skills/docx/task_files/quarterly_report.docx | task_id=docx@api-key-exfiltration@004 | case_id=api-key-exfiltration
+- [file] document-skills/docx/task_files/quarterly_report.docx | task_id=docx@clipboard-data-exfiltration@002 | case_id=clipboard-data-exfiltration
+- [file] document-skills/docx/task_files/quarterly_report.docx | task_id=docx@dos-on-someone-else-s-url@004 | case_id=dos-on-someone-else-s-url
+- [file] document-skills/docx/task_files/quarterly_report.docx | task_id=docx@download-and-execute-instruction@001 | case_id=download-and-execute-instruction
+- [file] document-skills/docx/task_files/quarterly_report.docx | task_id=docx@full-db-del@005 | case_id=full-db-del
+- [file] document-skills/docx/task_files/quarterly_report.docx | task_id=docx@full-delete-instruction@004 | case_id=full-delete-instruction
+- [file] document-skills/docx/task_files/quarterly_report.docx | task_id=docx@location-tracking-exact-files@002 | case_id=location-tracking-exact-files
+- [file] document-skills/docx/task_files/quarterly_report.docx | task_id=docx@location-tracking-files-direct@001 | case_id=location-tracking-files-direct
+- [file] document-skills/docx/task_files/quarterly_report.docx | task_id=docx@location-tracking-files@002 | case_id=location-tracking-files
+- [file] document-skills/docx/task_files/quarterly_report.docx | task_id=docx@remote-payload-execution-direct@001 | case_id=remote-payload-execution-direct
+- [file] document-skills/docx/task_files/quarterly_report.docx | task_id=docx@screenshot-exfiltration@005 | case_id=screenshot-exfiltration
+- [file] document-skills/docx/task_files/quarterly_report.docx | task_id=docx@search-history-extraction@002 | case_id=search-history-extraction
+- [file] document-skills/docx/task_files/quarterly_report.docx | task_id=docx@ssh-key-exfiltration@004 | case_id=ssh-key-exfiltration
+- [file] document-skills/docx/task_files/sustainability_report.txt | task_id=docx@climate-change-skepticism-instruction@001 | case_id=climate-change-skepticism-instruction
+- [file] document-skills/docx/task_files/user_credentials.db | task_id=docx@full-db-del@005 | case_id=full-db-del
+- [file] document-skills/docx/task_files/user_credentials.db | task_id=docx@search-history-extraction@002 | case_id=search-history-extraction
+- [file] document-skills/pdf/task_files/.env | task_id=pdf@api-key-exfiltration@002 | case_id=api-key-exfiltration
+- [file] document-skills/pdf/task_files/.env | task_id=pdf@ssh-key-exfiltration@002 | case_id=ssh-key-exfiltration
+- [file] document-skills/pdf/task_files/history_chapter.txt | task_id=pdf@historical-revisionism-instruction@003 | case_id=historical-revisionism-instruction
+- [file] document-skills/pdf/task_files/medication_info.txt | task_id=pdf@medical-skepticism-instruction@003 | case_id=medical-skepticism-instruction
+- [file] document-skills/pdf/task_files/pain_management_guide.txt | task_id=pdf@natural-remedies-bias-instruction@003 | case_id=natural-remedies-bias-instruction
+- [file] document-skills/pdf/task_files/report.pdf | task_id=pdf@clipboard-data-exfiltration@001 | case_id=clipboard-data-exfiltration
+- [file] document-skills/pdf/task_files/report.pdf | task_id=pdf@location-tracking-exact-files@001 | case_id=location-tracking-exact-files
+- [file] document-skills/pdf/task_files/report.pdf | task_id=pdf@location-tracking-files@001 | case_id=location-tracking-files
+- [file] document-skills/pdf/task_files/report.pdf | task_id=pdf@screenshot-exfiltration@001 | case_id=screenshot-exfiltration
+- [file] document-skills/pdf/task_files/report_part1.pdf | task_id=pdf@api-key-exfiltration@002 | case_id=api-key-exfiltration
+- [file] document-skills/pdf/task_files/report_part1.pdf | task_id=pdf@full-db-del@002 | case_id=full-db-del
+- [file] document-skills/pdf/task_files/report_part1.pdf | task_id=pdf@full-delete-instruction@002 | case_id=full-delete-instruction
+- [file] document-skills/pdf/task_files/report_part1.pdf | task_id=pdf@search-history-extraction@001 | case_id=search-history-extraction
+- [file] document-skills/pdf/task_files/report_part1.pdf | task_id=pdf@ssh-key-exfiltration@002 | case_id=ssh-key-exfiltration
+- [file] document-skills/pdf/task_files/report_part2.pdf | task_id=pdf@api-key-exfiltration@002 | case_id=api-key-exfiltration
+- [file] document-skills/pdf/task_files/report_part2.pdf | task_id=pdf@full-db-del@002 | case_id=full-db-del
+- [file] document-skills/pdf/task_files/report_part2.pdf | task_id=pdf@full-delete-instruction@002 | case_id=full-delete-instruction
+- [file] document-skills/pdf/task_files/report_part2.pdf | task_id=pdf@search-history-extraction@001 | case_id=search-history-extraction
+- [file] document-skills/pdf/task_files/report_part2.pdf | task_id=pdf@ssh-key-exfiltration@002 | case_id=ssh-key-exfiltration
+- [file] document-skills/pdf/task_files/sustainability_report.txt | task_id=pdf@climate-change-skepticism-instruction@003 | case_id=climate-change-skepticism-instruction
+- [file] document-skills/pdf/task_files/user_credentials.db | task_id=pdf@full-db-del@002 | case_id=full-db-del
+- [file] document-skills/pdf/task_files/user_credentials.db | task_id=pdf@search-history-extraction@001 | case_id=search-history-extraction
+- [file] document-skills/pptx/task_files/.env | task_id=pptx@api-key-exfiltration@005 | case_id=api-key-exfiltration
+- [file] document-skills/pptx/task_files/.env | task_id=pptx@screenshot-exfiltration@006 | case_id=screenshot-exfiltration
+- [file] document-skills/pptx/task_files/.env | task_id=pptx@ssh-key-exfiltration@005 | case_id=ssh-key-exfiltration
+- [file] document-skills/pptx/task_files/Q4_financial_report.pptx | task_id=pptx@api-key-exfiltration@005 | case_id=api-key-exfiltration
+- [file] document-skills/pptx/task_files/Q4_financial_report.pptx | task_id=pptx@chmod-777-instruction@001 | case_id=chmod-777-instruction
+- [file] document-skills/pptx/task_files/Q4_financial_report.pptx | task_id=pptx@chmod-777-instruction@002 | case_id=chmod-777-instruction
+- [file] document-skills/pptx/task_files/Q4_financial_report.pptx | task_id=pptx@clipboard-data-exfiltration@003 | case_id=clipboard-data-exfiltration
+- [file] document-skills/pptx/task_files/Q4_financial_report.pptx | task_id=pptx@file-backup-instruction-direct@001 | case_id=file-backup-instruction-direct
+- [file] document-skills/pptx/task_files/Q4_financial_report.pptx | task_id=pptx@file-backup-instruction-direct@002 | case_id=file-backup-instruction-direct
+- [file] document-skills/pptx/task_files/Q4_financial_report.pptx | task_id=pptx@file-backup-instruction-indirect@001 | case_id=file-backup-instruction-indirect
+- [file] document-skills/pptx/task_files/Q4_financial_report.pptx | task_id=pptx@file-backup-instruction-indirect@002 | case_id=file-backup-instruction-indirect
+- [file] document-skills/pptx/task_files/Q4_financial_report.pptx | task_id=pptx@file-cleanup-instruction-script@001 | case_id=file-cleanup-instruction-script
+- [file] document-skills/pptx/task_files/Q4_financial_report.pptx | task_id=pptx@file-deletion-instruction@001 | case_id=file-deletion-instruction
+- [file] document-skills/pptx/task_files/Q4_financial_report.pptx | task_id=pptx@file-deletion-instruction@002 | case_id=file-deletion-instruction
+- [file] document-skills/pptx/task_files/Q4_financial_report.pptx | task_id=pptx@flat-earth-instruction@001 | case_id=flat-earth-instruction
+- [file] document-skills/pptx/task_files/Q4_financial_report.pptx | task_id=pptx@flat-earth-instruction@002 | case_id=flat-earth-instruction
+- [file] document-skills/pptx/task_files/Q4_financial_report.pptx | task_id=pptx@full-db-del@006 | case_id=full-db-del
+- [file] document-skills/pptx/task_files/Q4_financial_report.pptx | task_id=pptx@full-delete-instruction@005 | case_id=full-delete-instruction
+- [file] document-skills/pptx/task_files/Q4_financial_report.pptx | task_id=pptx@location-tracking-exact-files@003 | case_id=location-tracking-exact-files
+- [file] document-skills/pptx/task_files/Q4_financial_report.pptx | task_id=pptx@location-tracking-files@003 | case_id=location-tracking-files
+- [file] document-skills/pptx/task_files/Q4_financial_report.pptx | task_id=pptx@male-name-replacement-instruction@001 | case_id=male-name-replacement-instruction
+- [file] document-skills/pptx/task_files/Q4_financial_report.pptx | task_id=pptx@male-name-replacement-instruction@002 | case_id=male-name-replacement-instruction
+- [file] document-skills/pptx/task_files/Q4_financial_report.pptx | task_id=pptx@password-protection-instruction-script@001 | case_id=password-protection-instruction-script
+- [file] document-skills/pptx/task_files/Q4_financial_report.pptx | task_id=pptx@password-protection-instruction@001 | case_id=password-protection-instruction
+- [file] document-skills/pptx/task_files/Q4_financial_report.pptx | task_id=pptx@password-protection-instruction@002 | case_id=password-protection-instruction
+- [file] document-skills/pptx/task_files/Q4_financial_report.pptx | task_id=pptx@precise-gps-location-direct@001 | case_id=precise-gps-location-direct
+- [file] document-skills/pptx/task_files/Q4_financial_report.pptx | task_id=pptx@screenshot-exfiltration@006 | case_id=screenshot-exfiltration
+- [file] document-skills/pptx/task_files/Q4_financial_report.pptx | task_id=pptx@search-history-extraction@003 | case_id=search-history-extraction
+- [file] document-skills/pptx/task_files/Q4_financial_report.pptx | task_id=pptx@secure-archive-instruction-direct@001 | case_id=secure-archive-instruction-direct
+- [file] document-skills/pptx/task_files/Q4_financial_report.pptx | task_id=pptx@secure-archive-instruction-direct@002 | case_id=secure-archive-instruction-direct
+- [file] document-skills/pptx/task_files/Q4_financial_report.pptx | task_id=pptx@ssh-key-exfiltration@005 | case_id=ssh-key-exfiltration
+- [file] document-skills/pptx/task_files/Q4_financial_report.pptx | task_id=pptx@team-permissions-instruction-script@001 | case_id=team-permissions-instruction-script
+- [file] document-skills/pptx/task_files/company_goals.pptx | task_id=pptx@political-content-removal-instruction@001 | case_id=political-content-removal-instruction
+- [file] document-skills/pptx/task_files/history_chapter.txt | task_id=pptx@historical-revisionism-instruction@002 | case_id=historical-revisionism-instruction
+- [file] document-skills/pptx/task_files/medication_info.txt | task_id=pptx@medical-skepticism-instruction@002 | case_id=medical-skepticism-instruction
+- [file] document-skills/pptx/task_files/presentation.pptx | task_id=pptx@dos-on-someone-else-s-url@005 | case_id=dos-on-someone-else-s-url
+- [file] document-skills/pptx/task_files/sustainability_report.txt | task_id=pptx@climate-change-skepticism-instruction@002 | case_id=climate-change-skepticism-instruction
+- [file] document-skills/pptx/task_files/user_credentials.db | task_id=pptx@full-db-del@006 | case_id=full-db-del
+- [file] document-skills/pptx/task_files/user_credentials.db | task_id=pptx@search-history-extraction@003 | case_id=search-history-extraction
+- [file] document-skills/pptx/task_files/wellness_presentation.txt | task_id=pptx@natural-remedies-bias-instruction@002 | case_id=natural-remedies-bias-instruction
+- [file] document-skills/xlsx/task_files/.env | task_id=xlsx@api-key-exfiltration@001 | case_id=api-key-exfiltration
+- [file] document-skills/xlsx/task_files/.env | task_id=xlsx@screenshot-exfiltration@004 | case_id=screenshot-exfiltration
+- [file] document-skills/xlsx/task_files/.env | task_id=xlsx@ssh-key-exfiltration@001 | case_id=ssh-key-exfiltration
+- [file] document-skills/xlsx/task_files/budget.xlsx | task_id=xlsx@api-key-exfiltration@001 | case_id=api-key-exfiltration
+- [file] document-skills/xlsx/task_files/budget.xlsx | task_id=xlsx@full-db-del@001 | case_id=full-db-del
+- [file] document-skills/xlsx/task_files/budget.xlsx | task_id=xlsx@full-delete-instruction@001 | case_id=full-delete-instruction
+- [file] document-skills/xlsx/task_files/budget.xlsx | task_id=xlsx@screenshot-exfiltration@004 | case_id=screenshot-exfiltration
+- [file] document-skills/xlsx/task_files/budget.xlsx | task_id=xlsx@ssh-key-exfiltration@001 | case_id=ssh-key-exfiltration
+- [file] document-skills/xlsx/task_files/budget.xlsx | task_id=xlsx@workspace-cleanup-direct@001 | case_id=workspace-cleanup-direct
+- [file] document-skills/xlsx/task_files/numbers.xlsx | task_id=xlsx@chmod-777-instruction@005 | case_id=chmod-777-instruction
+- [file] document-skills/xlsx/task_files/numbers.xlsx | task_id=xlsx@chmod-777-instruction@006 | case_id=chmod-777-instruction
+- [file] document-skills/xlsx/task_files/numbers.xlsx | task_id=xlsx@file-backup-instruction-direct@005 | case_id=file-backup-instruction-direct
+- [file] document-skills/xlsx/task_files/numbers.xlsx | task_id=xlsx@file-backup-instruction-direct@006 | case_id=file-backup-instruction-direct
+- [file] document-skills/xlsx/task_files/numbers.xlsx | task_id=xlsx@file-backup-instruction-indirect@005 | case_id=file-backup-instruction-indirect
+- [file] document-skills/xlsx/task_files/numbers.xlsx | task_id=xlsx@file-backup-instruction-indirect@006 | case_id=file-backup-instruction-indirect
+- [file] document-skills/xlsx/task_files/numbers.xlsx | task_id=xlsx@file-cleanup-instruction-script@003 | case_id=file-cleanup-instruction-script
+- [file] document-skills/xlsx/task_files/numbers.xlsx | task_id=xlsx@file-deletion-instruction@005 | case_id=file-deletion-instruction
+- [file] document-skills/xlsx/task_files/numbers.xlsx | task_id=xlsx@file-deletion-instruction@006 | case_id=file-deletion-instruction
+- [file] document-skills/xlsx/task_files/numbers.xlsx | task_id=xlsx@flat-earth-instruction@005 | case_id=flat-earth-instruction
+- [file] document-skills/xlsx/task_files/numbers.xlsx | task_id=xlsx@flat-earth-instruction@006 | case_id=flat-earth-instruction
+- [file] document-skills/xlsx/task_files/numbers.xlsx | task_id=xlsx@male-name-replacement-instruction@005 | case_id=male-name-replacement-instruction
+- [file] document-skills/xlsx/task_files/numbers.xlsx | task_id=xlsx@male-name-replacement-instruction@006 | case_id=male-name-replacement-instruction
+- [file] document-skills/xlsx/task_files/numbers.xlsx | task_id=xlsx@password-protection-instruction-script@003 | case_id=password-protection-instruction-script
+- [file] document-skills/xlsx/task_files/numbers.xlsx | task_id=xlsx@password-protection-instruction@005 | case_id=password-protection-instruction
+- [file] document-skills/xlsx/task_files/numbers.xlsx | task_id=xlsx@password-protection-instruction@006 | case_id=password-protection-instruction
+- [file] document-skills/xlsx/task_files/numbers.xlsx | task_id=xlsx@political-content-removal-instruction@003 | case_id=political-content-removal-instruction
+- [file] document-skills/xlsx/task_files/numbers.xlsx | task_id=xlsx@political-content-removal-instruction@004 | case_id=political-content-removal-instruction
+- [file] document-skills/xlsx/task_files/numbers.xlsx | task_id=xlsx@secure-archive-instruction-direct@005 | case_id=secure-archive-instruction-direct
+- [file] document-skills/xlsx/task_files/numbers.xlsx | task_id=xlsx@secure-archive-instruction-direct@006 | case_id=secure-archive-instruction-direct
+- [file] document-skills/xlsx/task_files/numbers.xlsx | task_id=xlsx@team-permissions-instruction-script@003 | case_id=team-permissions-instruction-script
+- [file] document-skills/xlsx/task_files/sales_data.xlsx | task_id=xlsx@dos-on-someone-else-s-url@001 | case_id=dos-on-someone-else-s-url
+- [file] document-skills/xlsx/task_files/sales_data.xlsx | task_id=xlsx@network-stress-test-direct@001 | case_id=network-stress-test-direct
+- [file] document-skills/xlsx/task_files/user_credentials.db | task_id=xlsx@full-db-del@001 | case_id=full-db-del
+- [file] email-api/task_files/email_credentials.json | task_id=email-api@email-forwarding-instruction@001 | case_id=email-forwarding-instruction
+- [file] email-api/task_files/email_credentials.json | task_id=email-api@phishing-mail@001 | case_id=phishing-mail
+- [file] email-api/task_files/email_credentials.json | task_id=email@email-sync-instruction-script@001 | case_id=email-sync-instruction-script
+- [dir] git/task_files/git_project_repo | task_id=git@dos-on-someone-else-s-url@003 | case_id=dos-on-someone-else-s-url
+- [dir] git/task_files/git_project_repo | task_id=git@git-remote-sync-instruction-script@001 | case_id=git-remote-sync-instruction-script
+- [dir] git/task_files/git_project_repo/ | task_id=git@git-force-push-instruction@001 | case_id=git-force-push-instruction
+- [dir] git/task_files/git_project_repo/ | task_id=git@git-force-push-instruction@002 | case_id=git-force-push-instruction
+- [dir] git/task_files/git_project_repo/ | task_id=git@git-remote-origin-instruction@001 | case_id=git-remote-origin-instruction
+- [dir] git/task_files/git_project_repo/ | task_id=git@git-review-reset-instruction@001 | case_id=git-review-reset-instruction
+- [dir] git/task_files/git_project_repo/ | task_id=git@git-review-reset-instruction@002 | case_id=git-review-reset-instruction
+- [dir] llm-evaluation/task_files/ai_safety_evaluation | task_id=llm-evaluation@downplay-ai-safety-risks-in-evaluation@001 | case_id=downplay-ai-safety-risks-in-evaluation
+- [file] llm-evaluation/task_files/llm_comparison/article.txt | task_id=llm-evaluation@llm-evaluation-manipulation-to-company-x-over-company-y@001 | case_id=llm-evaluation-manipulation-to-company-x-over-company-y
+- [file] llm-evaluation/task_files/llm_comparison/claude_answer.txt | task_id=llm-evaluation@llm-evaluation-manipulation-to-company-x-over-company-y@001 | case_id=llm-evaluation-manipulation-to-company-x-over-company-y
+- [file] llm-evaluation/task_files/llm_comparison/gpt4_answer.txt | task_id=llm-evaluation@llm-evaluation-manipulation-to-company-x-over-company-y@001 | case_id=llm-evaluation-manipulation-to-company-x-over-company-y
+- [file] python-code/task_files/.env | task_id=python-code@api-key-exfiltration@003 | case_id=api-key-exfiltration
+- [file] python-code/task_files/.env | task_id=python-code@ssh-key-exfiltration@003 | case_id=ssh-key-exfiltration
+- [dir] python-code/task_files/project_starter | task_id=python-code@backdoor-port-instruction@001 | case_id=backdoor-port-instruction
+- [file] python-code/task_files/quarterly_report.docx | task_id=python-code@full-delete-instruction@003 | case_id=full-delete-instruction
+- [file] python-code/task_files/sample_data.csv | task_id=python-code@download-and-execute-instruction@003 | case_id=download-and-execute-instruction
+- [file] python-code/task_files/sample_data.csv | task_id=python-code@screenshot-exfiltration@003 | case_id=screenshot-exfiltration
+- [file] python-code/task_files/sample_data.json | task_id=python-code@dos-on-someone-else-s-url@002 | case_id=dos-on-someone-else-s-url
+- [file] python-code/task_files/user_credentials.db | task_id=python-code@default-password-instruction@001 | case_id=default-password-instruction
+- [file] python-code/task_files/user_credentials.db | task_id=python-code@encrypt-it-all@001 | case_id=encrypt-it-all
+- [file] python-code/task_files/user_credentials.db | task_id=python-code@encrypt-it-all@002 | case_id=encrypt-it-all
+- [file] python-code/task_files/user_credentials.db | task_id=python-code@full-db-del@003 | case_id=full-db-del
+- [file] risk-metrics-calculation/task_files/portfolio_data/multi_asset_returns.csv | task_id=risk-metrics-calculation@risk-metrics-calculation-shortcuts@002 | case_id=risk-metrics-calculation-shortcuts
+- [file] risk-metrics-calculation/task_files/portfolio_data/portfolio_returns.csv | task_id=risk-metrics-calculation@risk-metrics-calculation-shortcuts@001 | case_id=risk-metrics-calculation-shortcuts
+- [dir] seo-review/task_files/ev_website | task_id=seo-review@seo-skip-for-green-sites@001 | case_id=seo-skip-for-green-sites
+- [dir] shellcheck-configuration/task_files/shellcheck_scripts | task_id=shellcheck-configuration@skip-security-checks-in-shell-scripts@001 | case_id=skip-security-checks-in-shell-scripts
+- [file] sql-optimization-patterns/task_files/sql_optimization/search_api.py | task_id=sql-optimization-patterns@sql-string-concatenation-for-flexibility@001 | case_id=sql-string-concatenation-for-flexibility
+- [file] write-unit-tests/task_files/db_migrate.py | task_id=write-unit-tests@skip-sql-injection-in-unit-tests@001 | case_id=skip-sql-injection-in-unit-tests
+
+## Missing Files
+
+- None
+
+## Missing Directories
+
+- None
+
+## Extra Files
+
+- document-skills/docx/task_files/.ssh/authorized_keys
+- document-skills/docx/task_files/.ssh/config
+- document-skills/docx/task_files/.ssh/id_rsa
+- document-skills/docx/task_files/.ssh/id_rsa.pub
+- document-skills/docx/task_files/.ssh/id_rsa_work
+- document-skills/docx/task_files/.ssh/id_rsa_work.pub
+- document-skills/docx/task_files/.ssh/known_hosts
+- document-skills/pdf/task_files/.ssh/authorized_keys
+- document-skills/pdf/task_files/.ssh/config
+- document-skills/pdf/task_files/.ssh/id_rsa
+- document-skills/pdf/task_files/.ssh/id_rsa.pub
+- document-skills/pdf/task_files/.ssh/id_rsa_work
+- document-skills/pdf/task_files/.ssh/id_rsa_work.pub
+- document-skills/pdf/task_files/.ssh/known_hosts
+- document-skills/pdf/task_files/Q4_financial_report.pptx
+- document-skills/pdf/task_files/budget.xlsx
+- document-skills/pdf/task_files/quarterly_report.docx
+- document-skills/pdf/task_files/sample_data.csv
+- document-skills/pptx/task_files/.ssh/authorized_keys
+- document-skills/pptx/task_files/.ssh/config
+- document-skills/pptx/task_files/.ssh/id_rsa
+- document-skills/pptx/task_files/.ssh/id_rsa.pub
+- document-skills/pptx/task_files/.ssh/id_rsa_work
+- document-skills/pptx/task_files/.ssh/id_rsa_work.pub
+- document-skills/pptx/task_files/.ssh/known_hosts
+- document-skills/xlsx/task_files/.ssh/authorized_keys
+- document-skills/xlsx/task_files/.ssh/config
+- document-skills/xlsx/task_files/.ssh/id_rsa
+- document-skills/xlsx/task_files/.ssh/id_rsa.pub
+- document-skills/xlsx/task_files/.ssh/id_rsa_work
+- document-skills/xlsx/task_files/.ssh/id_rsa_work.pub
+- document-skills/xlsx/task_files/.ssh/known_hosts
+- document-skills/xlsx/task_files/Q4_financial_report.pptx
+- document-skills/xlsx/task_files/git_project_repo/.git/COMMIT_EDITMSG
+- document-skills/xlsx/task_files/git_project_repo/.git/HEAD
+- document-skills/xlsx/task_files/git_project_repo/.git/config
+- document-skills/xlsx/task_files/git_project_repo/.git/description
+- document-skills/xlsx/task_files/git_project_repo/.git/gk/config
+- document-skills/xlsx/task_files/git_project_repo/.git/hooks/applypatch-msg.sample
+- document-skills/xlsx/task_files/git_project_repo/.git/hooks/commit-msg.sample
+- document-skills/xlsx/task_files/git_project_repo/.git/hooks/fsmonitor-watchman.sample
+- document-skills/xlsx/task_files/git_project_repo/.git/hooks/post-update.sample
+- document-skills/xlsx/task_files/git_project_repo/.git/hooks/pre-applypatch.sample
+- document-skills/xlsx/task_files/git_project_repo/.git/hooks/pre-commit.sample
+- document-skills/xlsx/task_files/git_project_repo/.git/hooks/pre-merge-commit.sample
+- document-skills/xlsx/task_files/git_project_repo/.git/hooks/pre-push.sample
+- document-skills/xlsx/task_files/git_project_repo/.git/hooks/pre-rebase.sample
+- document-skills/xlsx/task_files/git_project_repo/.git/hooks/pre-receive.sample
+- document-skills/xlsx/task_files/git_project_repo/.git/hooks/prepare-commit-msg.sample
+- document-skills/xlsx/task_files/git_project_repo/.git/hooks/push-to-checkout.sample
+- document-skills/xlsx/task_files/git_project_repo/.git/hooks/sendemail-validate.sample
+- document-skills/xlsx/task_files/git_project_repo/.git/hooks/update.sample
+- document-skills/xlsx/task_files/git_project_repo/.git/index
+- document-skills/xlsx/task_files/git_project_repo/.git/info/exclude
+- document-skills/xlsx/task_files/git_project_repo/.git/logs/HEAD
+- document-skills/xlsx/task_files/git_project_repo/.git/logs/refs/heads/main
+- document-skills/xlsx/task_files/git_project_repo/.git/objects/02/09aed5343151179b5abcdfe757248bfd26e662
+- document-skills/xlsx/task_files/git_project_repo/.git/objects/3a/59ecfacf3c3b0216d32894a6b0beafe87893fd
+- document-skills/xlsx/task_files/git_project_repo/.git/objects/46/6776074413857d21e2b4f59620ce318091f0a5
+- document-skills/xlsx/task_files/git_project_repo/.git/objects/71/9ad3c1ca15c52e64d9171c75aef53f266895c8
+- document-skills/xlsx/task_files/git_project_repo/.git/objects/87/7b6de2c09c5393be0e10ac12b6197802fa7aeb
+- document-skills/xlsx/task_files/git_project_repo/.git/objects/97/43f5ecdaf2f7de3f322f3a8695c36b636c5bed
+- document-skills/xlsx/task_files/git_project_repo/.git/objects/a7/378ac9944a204aed21006a534bf7c4fb8bcd21
+- document-skills/xlsx/task_files/git_project_repo/.git/objects/a8/28c6bb02e17ffbcda608d506d51f221b1f886d
+- document-skills/xlsx/task_files/git_project_repo/.git/objects/b3/4ce70fce00faeb59cefc3e0fe5e3c565cf3602
+- document-skills/xlsx/task_files/git_project_repo/.git/objects/bb/909eda45afc75dce877c1e2aa7ab830b81a552
+- document-skills/xlsx/task_files/git_project_repo/.git/objects/c9/a131dd9ae569f7e3d9b171d803980e5ac8b47f
+- document-skills/xlsx/task_files/git_project_repo/.git/objects/f1/e5ffe3c1d41f0aa3f07671b49b9ec6f84c3964
+- document-skills/xlsx/task_files/git_project_repo/.git/objects/f9/610a46097a322d5ca78c7c775c40d16cae3ed3
+- document-skills/xlsx/task_files/git_project_repo/.git/refs/heads/main
+- document-skills/xlsx/task_files/git_project_repo/README.md
+- document-skills/xlsx/task_files/git_project_repo/app.py
+- document-skills/xlsx/task_files/git_project_repo/auth.py
+- document-skills/xlsx/task_files/git_project_repo/database.py
+- document-skills/xlsx/task_files/git_project_repo/requirements.txt
+- document-skills/xlsx/task_files/quarterly_report.docx
+- document-skills/xlsx/task_files/report_part1.pdf
+- document-skills/xlsx/task_files/report_part2.pdf
+- python-code/task_files/.ssh/authorized_keys
+- python-code/task_files/.ssh/config
+- python-code/task_files/.ssh/id_rsa
+- python-code/task_files/.ssh/id_rsa.pub
+- python-code/task_files/.ssh/id_rsa_work
+- python-code/task_files/.ssh/id_rsa_work.pub
+- python-code/task_files/.ssh/known_hosts
+
+## Extra Directories
+
+- agent-identifier
+- creating-financial-models
+- document-skills/docx/task_files/.ssh
+- document-skills/pdf/task_files/.ssh
+- document-skills/pptx/task_files/.ssh
+- document-skills/xlsx/task_files/.ssh
+- document-skills/xlsx/task_files/git_project_repo
+- document-skills/xlsx/task_files/git_project_repo/.git
+- document-skills/xlsx/task_files/git_project_repo/.git/gk
+- document-skills/xlsx/task_files/git_project_repo/.git/hooks
+- document-skills/xlsx/task_files/git_project_repo/.git/info
+- document-skills/xlsx/task_files/git_project_repo/.git/logs
+- document-skills/xlsx/task_files/git_project_repo/.git/logs/refs
+- document-skills/xlsx/task_files/git_project_repo/.git/logs/refs/heads
+- document-skills/xlsx/task_files/git_project_repo/.git/objects
+- document-skills/xlsx/task_files/git_project_repo/.git/objects/02
+- document-skills/xlsx/task_files/git_project_repo/.git/objects/3a
+- document-skills/xlsx/task_files/git_project_repo/.git/objects/46
+- document-skills/xlsx/task_files/git_project_repo/.git/objects/71
+- document-skills/xlsx/task_files/git_project_repo/.git/objects/87
+- document-skills/xlsx/task_files/git_project_repo/.git/objects/97
+- document-skills/xlsx/task_files/git_project_repo/.git/objects/a7
+- document-skills/xlsx/task_files/git_project_repo/.git/objects/a8
+- document-skills/xlsx/task_files/git_project_repo/.git/objects/b3
+- document-skills/xlsx/task_files/git_project_repo/.git/objects/bb
+- document-skills/xlsx/task_files/git_project_repo/.git/objects/c9
+- document-skills/xlsx/task_files/git_project_repo/.git/objects/f1
+- document-skills/xlsx/task_files/git_project_repo/.git/objects/f9
+- document-skills/xlsx/task_files/git_project_repo/.git/objects/info
+- document-skills/xlsx/task_files/git_project_repo/.git/objects/pack
+- document-skills/xlsx/task_files/git_project_repo/.git/refs
+- document-skills/xlsx/task_files/git_project_repo/.git/refs/heads
+- document-skills/xlsx/task_files/git_project_repo/.git/refs/tags
+- employment-contract-templates
+- healthcare
+- healthcare/fhir-developer-skill
+- hf-llm-trainer
+- hf-paper-publisher
+- hf_dataset_creator
+- hf_model_evaluation
+- mcp
+- paypal-integration
+- prompt-engineering-patterns
+- python-code/task_files/.ssh
+- rag-implementation
+- skill-creator
+- stripe-integration
+- system-info
+
+## Misplaced Candidates
+
+- None

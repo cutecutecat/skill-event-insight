@@ -5,6 +5,9 @@ Structured skill dataset for evaluating agent defense behavior with WatchU-expor
 This repository includes safe and harmful skill cases, generation scripts, and per-directory judges:
 - `skill/base` -> safe baseline cases
 - `skill/inject` -> injected malicious cases generated from base
+- `skill/obvious` -> obvious injected cases generated from base
+- `skill/contextual` -> contextual injected cases generated from base
+- `skill/script` -> script-focused subset built from `inject` + `obvious` (only cases with `task_scripts`)
 - `skill/threat` -> curated toxic skills
 - `task/base` -> baseline task assets grouped by source skill
 - `task/inject` -> injected task assets generated from `task/base`
@@ -31,11 +34,15 @@ Benchmark-specific rule in this repo:
 
 - `skill/base/manifest.json`
 - `skill/inject/manifest.json`
+- `skill/obvious/manifest.json`
+- `skill/contextual/manifest.json`
+- `skill/script/manifest.json`
 - `skill/threat/manifest.json`
 - `config/inject.json`
 - `task/base`
 - `task/inject`
 - `generate/inject.py`
+- `generate/script_group.py`
 - `runner/common.py`
 - `runner/claude/run.py`
 - `runner/codex/run.py`
@@ -49,9 +56,10 @@ Benchmark-specific rule in this repo:
 - Injection config is in `config/inject.json` and follows a skill-inject style case definition.
 - Per-skill base task assets are stored under `task/base/<source_skill>/`, including:
   - `task_files/`
-  - `task_scripts/`
 - Inject task assets are generated into `task/inject/<case_dir>/` by `generate/inject.py`.
-- Injection task scripts source files are stored under `task/base/<source_skill>/task_scripts/` and are copied into `task/inject/<generated_skill>/task_scripts/` during generation.
+- Injection task scripts source files are stored under `config/inject/task_scripts/<source_skill>/` and are copied into `skill/inject/<generated_skill>/scripts/` during generation.
+- `task/inject/<case_dir>/` no longer stores `task_scripts/`; it keeps task-scoped `task_files/` only.
+- The runner no longer injects `task_scripts` at runtime.
 - Startup script is stored at `config/startup.sh` (referenced by `startup_scripts` in inject config).
 - WatchU is used in exported JSON mode only (no API dependency).
 
@@ -68,7 +76,10 @@ Only ensure:
 1. Generate injected dataset:
 
 ```bash
-./generate/inject.py --force
+python generate/inject.py --target skill/inject --task-target task/inject --config config/inject.json
+python generate/inject.py --target skill/contextual --task-target task/contextual --config config/inject_contextual.json
+python generate/inject.py --target skill/obvious --task-target task/obvious --config config/inject_obvious.json
+python generate/inject.py --target skill/script --task-target task/script --config config/inject_script.json
 ```
 
 This generates both:
@@ -76,6 +87,12 @@ This generates both:
 - `task/inject` (from `task/base`)
 
 If target directories are non-empty and `--force` is not provided, generation will stop with a warning.
+
+To build the `script` group (union of `inject` + `obvious` cases that define `task_scripts`):
+
+```bash
+./generate/script_group.py --force
+```
 
 2. Run task phase first:
 
@@ -122,7 +139,10 @@ python report/dump.py --group inject --gateway http://localhost:8080 --force
 ```
 
 `dump.py` reads `runs-root/<group>/*/timeline.json` (default `--runs-root runs`).
-Default output: per case `runs-root/<group>/<case_id>/event.json`.
+Default output per case:
+- `runs-root/<group>/<case_id>/event.full.json`
+- `runs-root/<group>/<case_id>/event.http.txt`
+- `runs-root/<group>/<case_id>/event.exec.txt`
 
 4. Run judge phase:
 
@@ -150,7 +170,7 @@ If you re-run `task`, re-run `dump` before `judge/report` so event windows stay 
 
 ## Manifest Format
 
-`skill/base`, `skill/inject`, and `skill/threat` each has its own `manifest.json`.
+Each `skill/<group>` directory has its own `manifest.json` (for example `base`, `inject`, `obvious`, `contextual`, `script`, `threat`).
 
 Required case fields:
 - `case_id`

@@ -54,7 +54,7 @@ def parse_args(default_agent: str) -> argparse.Namespace:
         default="task",
         help="Execution phase: task only or judge only",
     )
-    p.add_argument("--group", choices=["base", "inject", "threat", "test"], default="inject")
+    p.add_argument("--group", type=str, default="inject", help="Case group (maps to skill/<group>/manifest.json)")
     p.add_argument("--manifest", type=Path, default=None, help="Override manifest path")
     p.add_argument("--runs-root", type=Path, default=Path("runs"), help="Root output dir; data is written under runs-root/<group>/")
     p.add_argument("--model", type=str, default=None, help="Agent model name")
@@ -66,7 +66,12 @@ def parse_args(default_agent: str) -> argparse.Namespace:
         help="Global minimum delay (seconds) between any two LLM requests",
     )
     p.add_argument("-f", "--force", action="store_true", help="Overwrite existing case outputs")
-    p.add_argument("--config", type=Path, default=Path("config/inject.json"), help="Inject config for task prompt lookup")
+    p.add_argument(
+        "--config",
+        type=Path,
+        default=None,
+        help="Rule config JSON for prompt/assets lookup (default: config/<group>.json if exists, else config/inject.json)",
+    )
     return p.parse_args()
 
 
@@ -74,6 +79,15 @@ def resolve_manifest(group: str, manifest_override: Path | None) -> Path:
     if manifest_override is not None:
         return manifest_override
     return Path("skill") / group / "manifest.json"
+
+
+def resolve_config_path(group: str, config_override: Path | None) -> Path:
+    if config_override is not None:
+        return config_override
+    group_cfg = Path("config") / f"{group}.json"
+    if group_cfg.exists():
+        return group_cfg
+    return Path("config/inject.json")
 
 
 def load_json(path: Path) -> dict:
@@ -141,7 +155,10 @@ def load_prompt_map(config_path: Path) -> dict[str, str]:
         tasks = rule.get("tasks") or []
         prompt = ""
         if tasks and isinstance(tasks, list):
-            prompt = str((tasks[0] or {}).get("prompt", "")).strip()
+            t0 = tasks[0] or {}
+            prompts = t0.get("prompts") or []
+            if isinstance(prompts, list) and prompts:
+                prompt = str(prompts[0] or "").strip()
         if cid and prompt:
             out[cid] = prompt
     return out
@@ -166,6 +183,13 @@ def choose_task(rule: dict) -> dict:
     return tasks[0] or {}
 
 
+def choose_task_prompt(task: dict) -> str:
+    prompts = task.get("prompts") or []
+    if isinstance(prompts, list) and prompts:
+        return str(prompts[0] or "").strip()
+    return ""
+
+
 def resolve_case_prompt(case: dict, prompt_map: dict[str, str], rule: dict | None) -> str:
     case_id = str(case.get("case_id", "")).strip()
     for key in ("task_prompt", "prompt"):
@@ -174,7 +198,7 @@ def resolve_case_prompt(case: dict, prompt_map: dict[str, str], rule: dict | Non
             return val
     if rule:
         task = choose_task(rule)
-        task_prompt = str(task.get("prompt", "")).strip()
+        task_prompt = choose_task_prompt(task)
         if task_prompt:
             return task_prompt
     if case_id in prompt_map:
@@ -501,8 +525,11 @@ def resolve_source_skill(case: dict, rule: dict) -> str:
     case_skill = str(case.get("source_skill", "")).strip().strip("/")
     if case_skill:
         return case_skill
-    rule_skill = str(rule.get("source_skill", "")).strip().strip("/")
-    return rule_skill
+    task = choose_task(rule)
+    task_skill = str(task.get("source_skill", "")).strip().strip("/")
+    if task_skill:
+        return task_skill
+    return ""
 
 
 def resolve_task_scoped_asset(
@@ -524,7 +551,7 @@ def resolve_task_scoped_asset(
     candidates: list[Path] = []
     skill_dir = str(case.get("skill_dir", "")).strip()
 
-    if group in {"inject", "threat"}:
+    if group != "base":
         if skill_dir:
             candidates.append(task_root / group / skill_dir / category / rel_tail)
 
@@ -549,24 +576,9 @@ def stage_rule_assets(
     startup_scripts_root: Path,
     task_root: Path,
     workspace: Path,
-    skill_case_dir: Path,
 ) -> list[Path]:
     task = choose_task(rule)
     source_skill = resolve_source_skill(case, rule)
-
-    task_scripts = rule.get("task_scripts") or {}
-    for dst_name, rel_src in task_scripts.items():
-        rel = normalize_asset_rel(str(rel_src), "task_scripts")
-        src = resolve_task_scoped_asset(
-            task_root=task_root,
-            group=group,
-            case=case,
-            source_skill=source_skill,
-            category="task_scripts",
-            rel=rel,
-        )
-        dst = skill_case_dir / "scripts" / str(dst_name)
-        copy_asset(src, dst)
 
     task_files = task.get("task_files") or {}
     for dst_name, rel_src in task_files.items():
@@ -794,7 +806,7 @@ def run_one_case_task(
         workspace = tmp / "workspace"
         workspace.mkdir(parents=True, exist_ok=True)
 
-        skill_case_dir = copy_skill_for_case(case, group, workspace, agent_spec)
+        copy_skill_for_case(case, group, workspace, agent_spec)
         rule = rule_map.get(case_id, {})
         startup_paths = stage_rule_assets(
             case=case,
@@ -803,7 +815,6 @@ def run_one_case_task(
             startup_scripts_root=startup_scripts_root,
             task_root=task_root,
             workspace=workspace,
-            skill_case_dir=skill_case_dir,
         )
         if startup_paths:
             run_startup_scripts(startup_paths=startup_paths, workspace=workspace, timeout=timeout)
@@ -945,9 +956,10 @@ def run_cases_task(
     cases = manifest_data.get("cases", [])
     if not isinstance(cases, list):
         raise SystemExit(f"Invalid manifest (cases must be list): {manifest_path}")
-    prompt_map = load_prompt_map(args.config)
-    rule_map = load_rule_map(args.config)
-    startup_scripts_root = args.config.parent
+    config_path = resolve_config_path(args.group, args.config)
+    prompt_map = load_prompt_map(config_path)
+    rule_map = load_rule_map(config_path)
+    startup_scripts_root = config_path.parent
     task_root = Path("task")
 
     runs_root = args.runs_root
@@ -1026,7 +1038,8 @@ def run_cases_judge(
     cases = manifest_data.get("cases", [])
     if not isinstance(cases, list):
         raise SystemExit(f"Invalid manifest (cases must be list): {manifest_path}")
-    rule_map = load_rule_map(args.config)
+    config_path = resolve_config_path(args.group, args.config)
+    rule_map = load_rule_map(config_path)
 
     group_root = args.runs_root / args.group
     group_root.mkdir(parents=True, exist_ok=True)

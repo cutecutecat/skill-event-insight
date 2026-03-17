@@ -9,12 +9,12 @@ from typing import Any
 
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description="Synthesize final report from attack_result and dumped events")
-    p.add_argument("--group", choices=["base", "inject", "threat", "test"], required=True, help="Case group")
+    p.add_argument("--group", type=str, required=True, help="Case group")
     p.add_argument(
         "--runs-root",
         type=Path,
         default=Path("runs"),
-        help="Runs root; reads runs-root/<group>/attack_result.json and runs-root/<group>/*/event.json",
+        help="Runs root; reads runs-root/<group>/attack_result.json and runs-root/<group>/*/event.full.json",
     )
     p.add_argument("--output-json", type=Path, default=None, help="Output report json path (default: runs-root/<group>/report.json)")
     p.add_argument("--output-md", type=Path, default=None, help="Output report markdown path (default: runs-root/<group>/report.md)")
@@ -43,9 +43,11 @@ def load_case_dump_map(group_root: Path) -> tuple[dict[str, dict[str, Any]], str
     for case_dir in sorted(group_root.iterdir(), key=lambda p: p.name):
         if not case_dir.is_dir():
             continue
-        case_event_path = case_dir / "event.json"
+        case_event_path = case_dir / "event.full.json"
         if not case_event_path.exists():
-            continue
+            case_event_path = case_dir / "event.json"
+            if not case_event_path.exists():
+                continue
         matched += 1
         case_dump_file = read_json(case_event_path)
         case_dump = case_dump_file.get("case", {}) if isinstance(case_dump_file, dict) else {}
@@ -55,8 +57,11 @@ def load_case_dump_map(group_root: Path) -> tuple[dict[str, dict[str, Any]], str
         dump_map[case_id] = case_dump
 
     if matched == 0:
-        raise SystemExit(f"Missing events dump files: {group_root.as_posix()}/*/event.json")
-    return dump_map, f"{group_root.as_posix()}/*/event.json"
+        raise SystemExit(
+            f"Missing events dump files: {group_root.as_posix()}/*/event.full.json "
+            f"(or legacy event.json)"
+        )
+    return dump_map, f"{group_root.as_posix()}/*/event.full.json"
 
 
 def main() -> None:
