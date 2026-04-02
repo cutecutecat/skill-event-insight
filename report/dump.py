@@ -305,6 +305,8 @@ def dump_case(
     pe = process_events if isinstance(process_events, list) else []
     phe = process_http_events if isinstance(process_http_events, list) else []
     pe, phe, blocked_root_pids, blocked_root_exec_ids = _filter_watchu_internal_events(pe, phe)
+    pe = _sort_exec_events_by_start_ts(pe)
+    phe = _sort_http_events_by_timestamp(phe)
     parsed_phe: list[dict[str, Any]] = []
     full_phe: list[dict[str, Any]] = []
     body_parse_warnings: list[str] = []
@@ -393,14 +395,62 @@ def _materialize_newlines(text: str) -> str:
     return text.replace("\\r\\n", "\n").replace("\\n", "\n")
 
 
+def _parse_iso_ts_to_unix_ms(value: Any) -> int | None:
+    if not isinstance(value, str):
+        return None
+    s = value.strip()
+    if not s:
+        return None
+    iso = s.replace("Z", "+00:00")
+    try:
+        parsed = dt.datetime.fromisoformat(iso)
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=dt.timezone.utc)
+    return int(parsed.timestamp() * 1000)
+
+
+def _sort_exec_events_by_start_ts(events: list[Any]) -> list[Any]:
+    decorated: list[tuple[int, int, Any]] = []
+    for idx, ev in enumerate(events):
+        start_ts = ev.get("start_ts") if isinstance(ev, dict) else None
+        ms = _parse_iso_ts_to_unix_ms(start_ts)
+        if ms is None:
+            decorated.append((1, idx, ev))
+        else:
+            decorated.append((0, ms, ev))
+    decorated.sort(key=lambda item: (item[0], item[1]))
+    return [item[2] for item in decorated]
+
+
+def _sort_http_events_by_timestamp(events: list[Any]) -> list[Any]:
+    decorated: list[tuple[int, int, Any]] = []
+    for idx, ev in enumerate(events):
+        ts = ev.get("timestamp") if isinstance(ev, dict) else None
+        ms = _parse_iso_ts_to_unix_ms(ts)
+        if ms is None:
+            decorated.append((1, idx, ev))
+        else:
+            decorated.append((0, ms, ev))
+    decorated.sort(key=lambda item: (item[0], item[1]))
+    return [item[2] for item in decorated]
+
+
 def render_http_txt(process_http_events_parsed: list[Any]) -> str:
     lines: list[str] = []
-    for idx, ev in enumerate(process_http_events_parsed, start=1):
+    sorted_events = _sort_http_events_by_timestamp(process_http_events_parsed)
+    for ev in sorted_events:
         kind = "HTTP"
         if isinstance(ev, dict):
             kind = _http_event_kind(ev)
-        begin = f"<<<<__WATCHU_{kind}_EVENT_{idx:05d}_BEGIN__>>>>"
-        end = f"<<<<__WATCHU_{kind}_EVENT_{idx:05d}_END__>>>>"
+        label = "http event"
+        if kind == "REQUEST":
+            label = "http request event"
+        elif kind == "RESPONSE":
+            label = "http response event"
+        begin = f"--- {label} ---"
+        end = f"--- end {label} ---"
         lines.append(begin)
         if isinstance(ev, dict):
             body = ev.get("body_parsed")
@@ -413,9 +463,10 @@ def render_http_txt(process_http_events_parsed: list[Any]) -> str:
 
 def render_exec_txt(process_events: list[Any]) -> str:
     lines: list[str] = []
-    for idx, ev in enumerate(process_events, start=1):
-        begin = f"<<<<__WATCHU_EXEC_EVENT_{idx:05d}_BEGIN__>>>>"
-        end = f"<<<<__WATCHU_EXEC_EVENT_{idx:05d}_END__>>>>"
+    sorted_events = _sort_exec_events_by_start_ts(process_events)
+    for ev in sorted_events:
+        begin = "--- command exec event ---"
+        end = "--- end command exec event ---"
         line = ""
         if isinstance(ev, dict):
             comm = str(ev.get("comm", "")).strip()

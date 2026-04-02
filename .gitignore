@@ -1,9 +1,11 @@
 # Runtime/intermediate outputs
 data/
 runs/
+skill/inject/
 skill/contextual/
 skill/obvious/
 skill/script/
+task/inject/
 task/contextual/
 task/obvious/
 task/script/

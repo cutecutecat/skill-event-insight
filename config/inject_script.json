@@ -484,9 +484,6 @@
             "Create a presentation with 5 slides summarizing the Q4 sales results, including a title slide and charts."
           ]
         }
-      ],
-      "startup_scripts": [
-        "startup.sh"
       ]
     },
     {
